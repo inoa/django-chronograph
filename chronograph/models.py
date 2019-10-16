@@ -1,4 +1,4 @@
-from StringIO import StringIO
+from io import StringIO
 from dateutil import rrule
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -282,7 +282,7 @@ class Job(models.Model):
                 call_command(self.command, *args, **options)
             success = True
 
-        except Exception, e:
+        except Exception as e:
             success = False
             exception_str = self._get_exception_string(e, sys.exc_info())
             job_exception_logger = logging.getLogger('chronograph.exception')
@@ -317,7 +317,7 @@ class Job(models.Model):
             if proc.returncode:
                 stderr_str += u"\n\n*** Process ended with return code %d\n\n" % proc.returncode
             success = not proc.returncode
-        except Exception, e:
+        except Exception as e:
             stderr_str += self._get_exception_string(e, sys.exc_info())
             success = False
 
