@@ -202,7 +202,7 @@ class LogAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         qs = super(LogAdmin, self).get_queryset(request)
-        if request.resolver_match.func.func_name == 'changelist_view':
+        if request.resolver_match.func.__name__ == 'changelist_view':
             chars = self.LOG_TEXT_TRUNCATE_CHARS + 1
             extra_select = {'stdout_trunc': 'left(stdout, %s)' % chars, 'stderr_trunc': 'left(stderr, %s)' % chars}
             qs = qs.defer('stdout', 'stderr').extra(select=extra_select)
