@@ -1,7 +1,7 @@
 from .models import Job, Log
 from django import forms
 from django.conf import settings
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 from django.contrib import admin, messages
 from django.core.urlresolvers import reverse
 from django.db import models
@@ -177,10 +177,10 @@ class JobAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         urls = super(JobAdmin, self).get_urls()
-        my_urls = patterns('',
+        my_urls = [
             url(r'^(.+)/run/$', self.admin_site.admin_view(self.run_job_view), name="chronograph_job_run"),
             url(r'^(.+)/latest-log/$', self.admin_site.admin_view(self.latest_log_job_view), name="chronograph_job_latest_log"),
-        )
+        ]
         return my_urls + urls
 
 class LogAdmin(admin.ModelAdmin):
@@ -202,7 +202,7 @@ class LogAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         qs = super(LogAdmin, self).get_queryset(request)
-        if request.resolver_match.func.func_name == 'changelist_view':
+        if request.resolver_match.func.__name__ == 'changelist_view':
             chars = self.LOG_TEXT_TRUNCATE_CHARS + 1
             extra_select = {'stdout_trunc': 'left(stdout, %s)' % chars, 'stderr_trunc': 'left(stderr, %s)' % chars}
             qs = qs.defer('stdout', 'stderr').extra(select=extra_select)

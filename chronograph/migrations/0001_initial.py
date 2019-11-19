@@ -7,6 +7,8 @@ from django.conf import settings
 
 class Migration(migrations.Migration):
 
+    initial = True
+
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -17,7 +19,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('name', models.CharField(max_length=200, verbose_name='name')),
-                ('frequency', models.CharField(max_length=10, verbose_name='frequency', choices=[(b'YEARLY', 'Yearly'), (b'MONTHLY', 'Monthly'), (b'WEEKLY', 'Weekly'), (b'DAILY', 'Daily'), (b'HOURLY', 'Hourly'), (b'MINUTELY', 'Minutely'), (b'SECONDLY', 'Secondly')])),
+                ('frequency', models.CharField(max_length=10, verbose_name='frequency', choices=[('YEARLY', 'Yearly'), ('MONTHLY', 'Monthly'), ('WEEKLY', 'Weekly'), ('DAILY', 'Daily'), ('HOURLY', 'Hourly'), ('MINUTELY', 'Minutely'), ('SECONDLY', 'Secondly')])),
                 ('params', models.TextField(help_text='Semicolon separated list (no spaces) of <a href="http://labix.org/python-dateutil" target="_blank">rrule parameters</a>. e.g: interval:15 or byhour:6;byminute:40', null=True, verbose_name='params', blank=True)),
                 ('command', models.CharField(help_text='A valid django-admin command to run.', max_length=200, verbose_name='command', blank=True)),
                 ('shell_command', models.CharField(help_text='A shell command.', max_length=255, verbose_name='shell command', blank=True)),
