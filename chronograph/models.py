@@ -90,7 +90,7 @@ class Job(models.Model):
         help_text=_("A shell command."), blank=True)
     run_in_shell = models.BooleanField(default=False, help_text=_('This command needs to run within a shell?'))
     args = models.CharField(_("args"), max_length=200, blank=True,
-        help_text=_("Space separated list; e.g: arg1 option1=True"))
+        help_text=_("Space separated list; e.g: arg1 option1=True option2=\"string with spaces\" option3=escaped_backslash\\\\and_\\\"quote"))
     disabled = models.BooleanField(_("disabled"), default=False, help_text=_('If checked this job will never run.'))
     atomic = models.BooleanField(_("atomic"), default=True, help_text=_('If checked, the command is run wrapped in a database transaction, using Djano\'s atomic context manager.'))
     next_run = models.DateTimeField(_("next run"), blank=True, null=True, help_text=_("If you don't set this it will be determined automatically"))
@@ -184,7 +184,7 @@ class Job(models.Model):
         """
         args = []
         options = {}
-        for arg in self.args.split():
+        for arg in shlex.split(self.args):
             if arg.find('=') > -1:
                 key, value = arg.split('=')
                 options[smart_str(key)] = smart_str(value)
