@@ -51,5 +51,10 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(adjust_args_forwards, adjust_args_backwards),
+        migrations.AlterField(
+            model_name='job',
+            name='args',
+            field=models.CharField(help_text='Space separated list; e.g: arg1 option1=True option2="string with spaces" option3=escaped_backslash\\\\and_\\"quote', max_length=200, verbose_name='args', blank=True),
+        ),
     ]
 
