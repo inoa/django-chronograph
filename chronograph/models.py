@@ -229,15 +229,7 @@ class Job(models.Model):
         end_date = tz_now()
 
         # Create a log entry no matter what to see the last time the Job ran:
-        def ensure_unicode_log(text):
-            if text and not isinstance(text, unicode):
-                try:
-                    text = unicode(text, errors='ignore')
-                except:
-                    text = u"(encoding exception)"
-            return text
-        stdout_str = ensure_unicode_log(stdout_str)
-        stderr_str = ensure_unicode_log(stderr_str)
+
         log = Log.objects.create(
             job=self,
             run_date=run_date,
@@ -327,7 +319,7 @@ class Job(models.Model):
         try:
             t = loader.get_template('chronograph/error_message.txt')
             c = Context({
-                    'exception': unicode(e),
+                    'exception': str(e),
                     'traceback': ['\n'.join(traceback.format_exception(*exc_info))]
                     })
             return t.render(c)
