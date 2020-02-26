@@ -380,6 +380,10 @@ class Log(models.Model):
 
     class Meta:
         ordering = ['-pk']
+        indexes = [
+            models.Index(fields=['run_date'], name='run_date_idx'),
+            models.Index(fields=['job', 'run_date'], name='run_date_by_job_idx'),
+        ]
 
     def __str__(self):
         return u"%s" % self.job.name
