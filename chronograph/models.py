@@ -197,12 +197,15 @@ class Job(models.Model):
         Runs this ``Job``.  If ``save`` is ``True`` the dates (``last_run`` and ``next_run``)
         are updated.  If ``save`` is ``False`` the job simply gets run and nothing changes.
 
-        A ``Log`` will be created if there is any output from either stdout or stderr.
+        A ``Log`` instance will be created when the job starts running, and updated when it finishes.
         """
         run_date = tz_now()
         self.started_on = run_date
         self.is_running = True
         self.save()
+
+        log = Log(job=self, run_date=run_date, stdout="(job is still running)", success=True)
+        log.save()
 
         stdout_str, stderr_str = u"", u""
 
@@ -226,18 +229,13 @@ class Job(models.Model):
             self.last_run = run_date
             self.save()
 
+        # Update the previously created log entry
         end_date = tz_now()
-
-        # Create a log entry no matter what to see the last time the Job ran:
-
-        log = Log.objects.create(
-            job=self,
-            run_date=run_date,
-            end_date=end_date,
-            stdout=stdout_str,
-            stderr=stderr_str,
-            success=success,
-        )
+        log.end_date = end_date
+        log.stdout = stdout_str
+        log.stderr = stderr_str
+        log.success = success
+        log.save()
 
         # If there was any output to stderr, e-mail it to any error (defualt) subscribers.
         # We'll assume that if there was any error output, even if there was also info ouput
