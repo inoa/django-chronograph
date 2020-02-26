@@ -6,6 +6,7 @@ from django.contrib import admin, messages
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.forms import Textarea
+from django.forms.utils import flatatt
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import redirect
 from django.template.defaultfilters import linebreaks
@@ -13,11 +14,9 @@ from django.utils import dateformat, formats
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
-from django.utils.translation import ugettext_lazy as _
-try:
-    from django.forms.utils import flatatt  # Django >= 1.7
-except ImportError:
-    from django.forms.util import flatatt  # Django < 1.7
+from django.utils.timesince import timesince
+from django.utils.timezone import now as tz_now
+from django.utils.translation import ungettext, ugettext, ugettext_lazy as _
 
 
 class HTMLWidget(forms.Widget):
@@ -61,35 +60,38 @@ class JobForm(forms.ModelForm):
         return cleaned_data
 
 class JobAdmin(admin.ModelAdmin):
+    ordering =['-is_running', '-adhoc_run', 'disabled', 'next_run']
     actions = ['disable_jobs', 'enable_jobs', 'reset_jobs']
     form = JobForm
     list_display = (
-        'job_success', '_enabled', 'name', 'last_run_with_link', 'next_run_', 'get_timeuntil',
-        'frequency', 'started_on', 'is_running', 'run_button', 'view_logs_button',
+        '_enabled', 'id', 'name', 'command', '_frequency',
+        '_job_success', '_last_run_with_link', '_next_run',
+        '_is_running', '_run_button', '_view_logs_button',
     )
-    list_display_links = ('name',)
-    list_filter = ('last_run_successful', 'frequency', 'disabled')
-    search_fields = ('name',)
-    ordering = ('-is_running', '-adhoc_run', 'disabled', 'next_run')
+    list_display_links = ('id', 'name')
+    list_filter = ('last_run_successful', 'command', 'frequency', 'disabled', 'is_running')
+    search_fields = ('name', 'command')
     if not getattr(settings, 'CHRONOGRAPH_DISABLE_EMAIL_SUBSCRIPTION', False):
         filter_horizontal = ('subscribers', 'info_subscribers')
 
     fieldsets = (
         (_('Job Details'), {
             'classes': ('wide',),
-            'fields': ('name', 'disabled', 'command', 'shell_command', 'run_in_shell', 'args', 'atomic',)
-        }),
-        (_('E-mail subscriptions'), {
-            'classes': ('wide',),
-            'fields': ('info_subscribers', 'subscribers',)
+            'fields': ('name', 'disabled', 'command', 'args', 'atomic',)
+                      if getattr(settings, 'CHRONOGRAPH_DISABLE_SHELL_OPTIONS', False) else
+                      ('name', 'disabled', 'command', 'shell_command', 'run_in_shell', 'args', 'atomic')
         }),
         (_('Frequency options'), {
             'classes': ('wide',),
             'fields': ('frequency', 'next_run', 'params',)
         }),
+        (_('E-mail subscriptions'), {
+            'classes': ('wide',),
+            'fields': ('info_subscribers', 'subscribers',)
+        }),
     )
     if getattr(settings, 'CHRONOGRAPH_DISABLE_EMAIL_SUBSCRIPTION', False):
-        fieldsets = (fieldsets[0], fieldsets[2])
+        fieldsets = (fieldsets[0], fieldsets[1])
 
     def enable_jobs(self, request, queryset):
         return queryset.update(disabled=False)
@@ -103,49 +105,78 @@ class JobAdmin(admin.ModelAdmin):
     def _enabled(self, obj):
         return not obj.disabled
     _enabled.short_description = _('Enabled')
-    _enabled.admin_order_field = 'disabled'
     _enabled.boolean = True
 
-    def last_run_with_link(self, obj):
+    def _job_success(self, obj):
+        return obj.last_run_successful
+    _job_success.short_description = _(u'Healthy')
+    _job_success.boolean = True
+
+    def _frequency(self, obj):
+        return obj.get_actual_frequency()
+    _frequency.short_description = _('Frequency')
+    _frequency.admin_order_field = 'frequency'
+
+    def _is_running(self, obj):
+        if not obj.is_running:
+            return "⚪"
+        value = "▶️"
+        if obj.started_on:
+            now = tz_now()
+            delta = now - obj.started_on
+            if delta.seconds < 60:
+                # Adapted from django.utils.timesince
+                count = lambda n: ungettext('second', 'seconds', n)
+                time_since_text = ugettext('%(number)d %(type)s') % {
+                    'number': delta.seconds,
+                    'type': count(delta.seconds)
+                }
+            else:
+                time_since_text = timesince(obj.started_on, now)
+            format_ = formats.get_format('DATETIME_FORMAT')
+            started_on_text = capfirst(dateformat.format(obj.started_on, format_))
+            value = "<span title=\"Started on: {}\" style=\"white-space: nowrap;\">{} {}</span>".format(
+                    started_on_text, value, time_since_text)
+        return value
+    _is_running.short_description = _('Running')
+    _is_running.allow_tags = True
+
+    def _next_run(self, obj):
+        value = obj.get_timeuntil()
+        if obj.next_run:
+            format_ = formats.get_format('DATETIME_FORMAT')
+            scheduled_text = capfirst(dateformat.format(obj.next_run, format_))
+            value = "<span title=\"Scheduled time: {}\">{}</span>".format(
+                    scheduled_text, value)
+        return value
+    _next_run.short_description = _('Next run')
+    _next_run.admin_order_field = 'next_run'
+    _next_run.allow_tags = True
+
+    def _last_run_with_link(self, obj):
         if not obj.last_run:
             return None
         format_ = formats.get_format('DATETIME_FORMAT')
         value = capfirst(dateformat.format(obj.last_run, format_))
         reversed_url = reverse('admin:chronograph_job_latest_log', args=[obj.pk])
         return '<a href="%s">%s</a>' % (reversed_url, value)
-    last_run_with_link.allow_tags = True
-    last_run_with_link.short_description = _('Last run')
-    last_run_with_link.admin_order_field = 'last_run'
+    _last_run_with_link.allow_tags = True
+    _last_run_with_link.short_description = _('Last run')
+    _last_run_with_link.admin_order_field = 'last_run'
 
-    def next_run_(self, obj):
-        if obj.adhoc_run:
-            return 'Immediate run scheduled'
-        elif not obj.next_run:
-            return 'Not scheduled'
-        else:
-            format_ = formats.get_format('DATETIME_FORMAT')
-            return capfirst(dateformat.format(obj.next_run, format_))
-    next_run_.short_description = _('Next run')
-    next_run_.admin_order_field = 'next_run'
-
-    def job_success(self, obj):
-        return obj.last_run_successful
-    job_success.short_description = _(u'OK')
-    job_success.boolean = True
-
-    def run_button(self, obj):
+    def _run_button(self, obj):
         if obj.adhoc_run or obj.is_running:
             return '-'
         reversed_url = reverse('admin:chronograph_job_run', args=[obj.pk]) + '?inline=1'
         return '<a href="%s" class="btn btn-default">Run</a>' % reversed_url
-    run_button.allow_tags = True
-    run_button.short_description = _('Run')
+    _run_button.allow_tags = True
+    _run_button.short_description = _('Run')
 
-    def view_logs_button(self, obj):
+    def _view_logs_button(self, obj):
         reversed_url = reverse('admin:chronograph_log_changelist') + '?job=%d' % obj.pk
         return '<a href="%s" class="btn btn-default">View Logs</a>' % reversed_url
-    view_logs_button.allow_tags = True
-    view_logs_button.short_description = _('Logs')
+    _view_logs_button.allow_tags = True
+    _view_logs_button.short_description = _('Logs')
     
     def latest_log_job_view(self, request, pk):
         log_qs = Log.objects.filter(job_id=pk).order_by('-run_date')[0:1]
@@ -184,6 +215,7 @@ class JobAdmin(admin.ModelAdmin):
         return my_urls + urls
 
 class LogAdmin(admin.ModelAdmin):
+    ordering = ['-run_date']
     list_display = ('job_name', 'run_date', 'end_date', 'job_duration', 'job_success', 'output', 'errors',)
     list_select_related = ('job',)
     list_filter = ('job', 'run_date', 'end_date', 'success')

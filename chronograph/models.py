@@ -105,12 +105,18 @@ class Job(models.Model):
     objects = JobManager()
 
     class Meta:
-        ordering = ('disabled', 'next_run',)
+        ordering = ['name', 'id']
 
     def __str__(self):
-        if self.disabled:
-            return _(u"%(name)s - disabled") % {'name': self.name}
-        return self.name
+        try:
+            pk = str(self.pk or "N/A")
+        except:
+            pk = "N/A"
+        try:
+            name = str(self.name or "Unnamed Job")
+        except:
+            name = "Unnamed Job"
+        return "{} (#{})".format(name, pk)
 
     def save(self, *args, **kwargs):
         if not self.disabled:
@@ -150,6 +156,40 @@ class Job(models.Model):
         return timeuntil(self.next_run)
     get_timeuntil.short_description = _('time until next run')
     timeuntil = property(get_timeuntil)
+
+    def get_actual_frequency(self):
+        frequency = getattr(rrule, self.frequency, None)
+        frequency_str_map = {
+            rrule.YEARLY: "year",
+            rrule.MONTHLY: "month",
+            rrule.WEEKLY: "week",
+            rrule.DAILY: "day",
+            rrule.HOURLY: "hour",
+            rrule.MINUTELY: "minute",
+        }
+        value = frequency_str_map.get(frequency)
+        if not value:
+            return "Invalid"
+        rule = rrule.rrule(frequency, dtstart=self.next_run, **self.get_params())
+
+        if not rule._interval or rule._interval == 1:
+            value = "Every {}".format(value)
+        else:
+            value = "Every {} {}s".format(rule._interval, value)
+
+        if rule._byhour and rule._byminute and len(rule._byhour) == len(rule._byminute) == 1:
+            hour = list(rule._byhour)[0]
+            minute = list(rule._byminute)[0]
+            value = "{} at {:02}:{:02}".format(value, hour, minute)
+        else:
+            if rule._byhour:
+                fmt = lambda x: "{}h".format(x)
+                value = "{} at {}".format(value, ", ".join(map(fmt, rule._byhour)))
+            if rule._byminute:
+                fmt = lambda x: "{}m".format(x)
+                value = "{} at minute{} {}".format(value, "s" if len(rule._byminute) > 1 else "",
+                                                   "/".join(map(str, rule._byminute)))
+        return value
 
     def get_rrule(self):
         """
@@ -339,7 +379,7 @@ class Log(models.Model):
     success = models.BooleanField(default=True, editable=False)
 
     class Meta:
-        ordering = ('-run_date',)
+        ordering = ['-pk']
 
     def __str__(self):
         return u"%s" % self.job.name
