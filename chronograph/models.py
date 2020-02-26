@@ -29,7 +29,7 @@ class JobManager(models.Manager):
             return 0
         now = datetime.datetime.now()
         started_on_limit = now - datetime.timedelta(minutes=time_limit)
-        stuck_jobs = self.filter(is_running=True, started_on__lt=started_on_limit)
+        stuck_jobs = list(self.filter(is_running=True, started_on__lt=started_on_limit))
         for job in stuck_jobs:
             time_spent = int((now - job.started_on).total_seconds() / 60)
             subject = u"Stuck job: %s (#%s)" % (job.name, job.id)
@@ -46,7 +46,7 @@ class JobManager(models.Manager):
             job.next_run = None
             job.last_run_successful = False
             job.save()
-        return len(stuck_jobs)
+        return stuck_jobs
     
     def due_jobs_filter_query(self):
         return (Q(next_run__lte=tz_now(), disabled=False, is_running=False) | Q(adhoc_run=True, is_running=False))

@@ -179,7 +179,7 @@ class JobAdmin(admin.ModelAdmin):
     _view_logs_button.short_description = _('Logs')
     
     def latest_log_job_view(self, request, pk):
-        log_qs = Log.objects.filter(job_id=pk).order_by('-run_date')[0:1]
+        log_qs = Log.objects.filter(job_id=pk).exclude(end_date=None).order_by('-run_date')[0:1]
         if log_qs:
             return redirect('admin:chronograph_log_change', log_qs[0].pk)
         else:
