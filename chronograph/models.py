@@ -107,7 +107,7 @@ class Job(models.Model):
     class Meta:
         ordering = ('disabled', 'next_run',)
 
-    def __unicode__(self):
+    def __str__(self):
         if self.disabled:
             return _(u"%(name)s - disabled") % {'name': self.name}
         return self.name
@@ -343,7 +343,7 @@ class Log(models.Model):
     class Meta:
         ordering = ('-run_date',)
 
-    def __unicode__(self):
+    def __str__(self):
         return u"%s" % self.job.name
 
     def get_duration(self):
