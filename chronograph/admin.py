@@ -232,8 +232,15 @@ class LogAdmin(admin.ModelAdmin):
     readonly_fields = ['job', 'run_date', 'end_date', 'job_duration', 'job_success', 'stdout_pre', 'stderr_pre']
     LOG_TEXT_TRUNCATE_CHARS = 40
     
+    def get_list_select_related(self, request):
+        # Do not perform select_related to Job (see the comment in get_queryset below).
+        return ()
+
     def get_queryset(self, request):
         qs = super(LogAdmin, self).get_queryset(request)
+        # Use prefetch_related instead of select_related because SQL Server sometimes doesn't use
+        # the run_date index when an INNER JOIN is made to Job, and performs a slow full table scan instead.
+        qs = qs.select_related(None).prefetch_related('job')
         if request.resolver_match.func.__name__ == 'changelist_view':
             chars = self.LOG_TEXT_TRUNCATE_CHARS + 1
             extra_select = {'stdout_trunc': 'left(stdout, %s)' % chars, 'stderr_trunc': 'left(stderr, %s)' % chars}
