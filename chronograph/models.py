@@ -314,7 +314,7 @@ class Job(models.Model):
 
         except Exception as e:
             success = False
-            exception_str = self._get_exception_string(e, sys.exc_info())
+            exception_str = "[Unhandled exception]\n" + self._get_exception_string(e, sys.exc_info())
             job_exception_logger = logging.getLogger('chronograph.exception')
             job_exception_logger.error(u"Job Error: %s (%s)", self.name, self.command,
                                          exc_info=sys.exc_info(), extra={'job': self})
@@ -356,13 +356,13 @@ class Job(models.Model):
     def _get_exception_string(self, e, exc_info):
         try:
             t = loader.get_template('chronograph/error_message.txt')
-            c = Context({
-                    'exception': str(e),
-                    'traceback': ['\n'.join(traceback.format_exception(*exc_info))]
-                    })
+            c = {
+                'exception': str(e),
+                'traceback': ["\n".join(traceback.format_exception(*exc_info))],
+            }
             return t.render(c)
         except:
-            return u"Unable to render traceback."
+            return u"Unable to render exception traceback."
 
 
 
